@@ -1,0 +1,33 @@
+# 基金推荐助手配置文件
+
+# ==================== LLM 配置 ====================
+# Anthropic Claude API Key
+# 也可以通过环境变量 ANTHROPIC_API_KEY 设置
+anthropic_api_key: ""
+
+# Claude 模型名称
+claude_model: "claude-sonnet-4-5-20250929"
+
+# ==================== 数据源配置 ====================
+# Tushare Token（可选，作为备用数据源）
+# 注册地址：https://tushare.pro/
+# 也可以通过环境变量 TUSHARE_TOKEN 设置
+tushare_token: ""
+
+# 聚宽账号（可选，作为备用数据源）
+# 注册地址：https://www.joinquant.com/
+# 也可以通过环境变量 JQ_USERNAME 和 JQ_PASSWORD 设置
+jq_username: ""
+jq_password: ""
+
+# ==================== 缓存配置 ====================
+# SQLite 数据库路径
+db_path: "data/fund_cache.db"
+
+# 数据更新间隔（小时）
+# 默认 24 小时，即每天更新一次数据
+data_update_interval: 24
+
+# ==================== 其他配置 ====================
+# 是否启用详细日志
+verbose: false

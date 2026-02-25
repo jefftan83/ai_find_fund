@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:akshare.akfamily.xyz)",
+      "WebFetch(domain:www.tushare.pro)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:microsoft.github.io)",
+      "Bash(chmod +x build.sh && pip install -e . 2>&1)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(pyinstaller:*)",
+      "Bash(pip install:*)"
+    ]
+  }
+}
