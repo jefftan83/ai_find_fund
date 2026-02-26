@@ -105,16 +105,18 @@ class AKShareClient:
             df = ak.fund_open_fund_rank_em(symbol=fund_type)
             result = []
             for _, row in df.iterrows():
+                # 使用 iloc 按位置访问，避免中文字段名访问问题
+                # 列顺序：0-序号，1-基金代码，2-基金简称，8-近 1 月，9-近 3 月，10-近 6 月，11-近 1 年，13-近 3 年，14-今年来
                 result.append({
-                    "fund_code": str(row.get("基金代码", "")),
-                    "fund_name": str(row.get("基金名称", "")),
-                    "rank": int(row.get("排名", 0) or 0),
-                    "return_1m": float(row.get("近 1 月", 0) or 0),
-                    "return_3m": float(row.get("近 3 月", 0) or 0),
-                    "return_6m": float(row.get("近 6 月", 0) or 0),
-                    "return_1y": float(row.get("近 1 年", 0) or 0),
-                    "return_3y": float(row.get("近 3 年", 0) or 0),
-                    "return_ytd": float(row.get("今年来", 0) or 0)
+                    "fund_code": str(row.iloc[1]),
+                    "fund_name": str(row.iloc[2]),
+                    "rank": int(row.iloc[0] or 0),
+                    "return_1m": float(row.iloc[8] or 0),
+                    "return_3m": float(row.iloc[9] or 0),
+                    "return_6m": float(row.iloc[10] or 0),
+                    "return_1y": float(row.iloc[11] or 0),
+                    "return_3y": float(row.iloc[13] or 0),
+                    "return_ytd": float(row.iloc[14] or 0)
                 })
             return result
         except Exception as e:

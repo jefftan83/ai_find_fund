@@ -32,8 +32,9 @@ def _get_user_input() -> str:
     """
     # 使用 Python 原生 input()，配合 readline 模块支持退格键
     # 提示符 "您：" 由 input() 自己显示，不会被退格键删除
+    # 使用 ANSI 转义序列让提示符显示为绿色
     try:
-        user_input = input("您：")
+        user_input = input("\033[32m 您：\033[0m")
         return user_input.strip()
     except (EOFError, KeyboardInterrupt):
         return ""
