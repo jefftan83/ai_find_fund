@@ -1,8 +1,11 @@
 """基金专家 Agent - 根据用户需求和风险等级推荐基金"""
 
+import asyncio
+import sqlite3
 from typing import Dict, Any, List
 from src.utils.llm import ClaudeClient
 from src.services.fund_data import fund_data_service
+from src.cache.db import cache_db
 
 
 class FundExpertAgent:
@@ -82,15 +85,43 @@ class FundExpertAgent:
             # 获取排行数据
             ranking = await fund_data_service.get_fund_ranking(target_type)
 
-            # 筛选：近 1 年收益>0，近 3 年收益>0
+            # 筛选：近 1 年收益>0（近 3 年收益为 0 表示成立不足 3 年，不作为筛选条件）
             self.screened_funds = [
                 f for f in ranking
-                if f.get("return_1y", 0) > 0 and f.get("return_3y", 0) > 0
-            ][:20]  # 取前 20 只
+                if f.get("return_1y", 0) > 0  # 只需近 1 年收益为正
+            ][:50]  # 取前 50 只
+
+            # 异步补充规模数据
+            asyncio.create_task(self._preload_size_data())
 
         except Exception as e:
             print(f"筛选基金失败：{e}")
             self.screened_funds = []
+
+    async def _preload_size_data(self):
+        """预加载规模数据到缓存"""
+        from src.services.akshare_client import akshare_client
+
+        fund_codes = [f.get('fund_code') for f in self.screened_funds]
+
+        for code in fund_codes:
+            try:
+                # 检查缓存是否有数据
+                basic = cache_db.get_fund_basic(code)
+                if basic and basic.get('net_asset_size'):
+                    continue  # 已有数据，跳过
+
+                # 获取规模
+                size_info = await akshare_client.get_fund_size(code)
+                if size_info:
+                    # 更新缓存
+                    cache_db.save_fund_basic(code, {
+                        "fund_code": code,
+                        "net_asset_size": size_info.get("net_asset_size"),
+                        "share_size": size_info.get("share_size")
+                    })
+            except Exception as e:
+                pass  # 静默失败，不影响主流程
 
     async def generate_recommendation(self) -> str:
         """
@@ -144,16 +175,58 @@ class FundExpertAgent:
             return f"【系统错误】生成推荐失败：{str(e)}"
 
     def _prepare_fund_summary(self) -> str:
-        """准备基金数据摘要"""
+        """准备基金数据摘要（同时补充规模数据）"""
         lines = []
-        for i, fund in enumerate(self.screened_funds[:10], 1):
+
+        # 批量获取规模数据（从缓存）
+        fund_codes = [f.get('fund_code') for f in self.screened_funds[:30]]
+        size_cache = self._get_size_cache(fund_codes)
+
+        # 展示前 30 只基金给 LLM
+        for i, fund in enumerate(self.screened_funds[:30], 1):
+            code = fund.get('fund_code')
+            size_info = size_cache.get(code, {})
+            net_asset_size = size_info.get('net_asset_size', 'N/A')
+
             lines.append(f"""
-{i}. {fund.get('fund_code')} - {fund.get('fund_name')}
-   近 1 月：{fund.get('return_1m', 0):.2f}% | 近 3 月：{fund.get('return_3m', 0):.2f}%
+{i}. {code} - {fund.get('fund_name')}
+   规模：{net_asset_size} | 近 1 月：{fund.get('return_1m', 0):.2f}% | 近 3 月：{fund.get('return_3m', 0):.2f}%
    近 6 月：{fund.get('return_6m', 0):.2f}% | 近 1 年：{fund.get('return_1y', 0):.2f}%
    近 3 年：{fund.get('return_3y', 0):.2f}% | 今年来：{fund.get('return_ytd', 0):.2f}%
 """)
         return "\n".join(lines)
+
+    def _get_size_cache(self, fund_codes: List[str]) -> Dict[str, Dict[str, str]]:
+        """
+        从缓存获取基金规模数据
+
+        Args:
+            fund_codes: 基金代码列表
+
+        Returns:
+            规模数据缓存
+        """
+        cache = {}
+        try:
+            conn = cache_db._get_connection()
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT fund_code, net_asset_size, share_size
+                FROM fund_basic
+                WHERE fund_code IN ({})
+            """.format(','.join('?' * len(fund_codes))), fund_codes)
+
+            for row in cursor.fetchall():
+                cache[row['fund_code']] = {
+                    'net_asset_size': row['net_asset_size'] or 'N/A',
+                    'share_size': row['share_size'] or 'N/A'
+                }
+            conn.close()
+        except Exception as e:
+            print(f"获取规模缓存失败：{e}")
+
+        return cache
 
     def get_top_funds(self, n: int = 5) -> List[Dict[str, Any]]:
         """获取推荐的 top N 基金"""

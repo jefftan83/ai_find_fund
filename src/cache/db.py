@@ -37,6 +37,8 @@ class CacheDB:
                     company TEXT,
                     manager TEXT,
                     established_date TEXT,
+                    net_asset_size TEXT,
+                    share_size TEXT,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -110,8 +112,8 @@ class CacheDB:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO fund_basic
-                (fund_code, fund_name, fund_type, company, manager, established_date, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (fund_code, fund_name, fund_type, company, manager, established_date, net_asset_size, share_size, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 fund_code,
                 data.get("fund_name"),
@@ -119,6 +121,8 @@ class CacheDB:
                 data.get("company"),
                 data.get("manager"),
                 data.get("established_date"),
+                data.get("net_asset_size"),
+                data.get("share_size"),
                 datetime.now()
             ))
             conn.commit()

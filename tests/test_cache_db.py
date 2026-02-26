@@ -263,3 +263,47 @@ class TestCacheDB:
         result = db.get_fund_nav("000001", start_date="2025-02-01", end_date="2025-02-28")
         assert len(result) == 1
         assert result[0]["nav_date"] == "2025-02-01"
+
+    def test_save_fund_size(self, temp_db):
+        """DB-019: 保存基金规模数据"""
+        db = temp_db
+        fund_data = {
+            "fund_code": "000001",
+            "net_asset_size": "10.5 亿",
+            "share_size": "9.8 亿份"
+        }
+        db.save_fund_basic("000001", fund_data)
+
+        # 验证保存成功
+        result = db.get_fund_basic("000001")
+        assert result is not None
+        assert result["net_asset_size"] == "10.5 亿"
+        assert result["share_size"] == "9.8 亿份"
+
+    def test_get_fund_size_not_exists(self, temp_db):
+        """DB-020: 获取不存在的规模数据"""
+        db = temp_db
+        result = db.get_fund_basic("999999")
+        assert result is None
+
+    def test_update_fund_size(self, temp_db):
+        """DB-021: 更新基金规模数据"""
+        db = temp_db
+        # 首次保存
+        db.save_fund_basic("000001", {
+            "fund_code": "000001",
+            "net_asset_size": "10 亿",
+            "share_size": "9 亿份"
+        })
+
+        # 更新规模数据
+        db.save_fund_basic("000001", {
+            "fund_code": "000001",
+            "net_asset_size": "15 亿",
+            "share_size": "14 亿份"
+        })
+
+        # 验证更新成功
+        result = db.get_fund_basic("000001")
+        assert result["net_asset_size"] == "15 亿"
+        assert result["share_size"] == "14 亿份"

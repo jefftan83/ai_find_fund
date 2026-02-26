@@ -135,6 +135,76 @@ ai_find_fund/
 └── README.md
 ```
 
+## 数据库表结构
+
+数据存储于 `~/.ai_find_fund/fund_cache.db`（SQLite）
+
+### 1. fund_basic - 基金基本信息表
+
+| 字段名 | 类型 | 说明 |
+|:------:|:----:|:-----|
+| `fund_code` | TEXT | **主键** - 基金代码（如：000001） |
+| `fund_name` | TEXT | 基金名称 |
+| `fund_type` | TEXT | 基金类型（混合型、债券型、股票型等） |
+| `company` | TEXT | 基金管理人/基金公司 |
+| `manager` | TEXT | 基金经理 |
+| `established_date` | TEXT | 成立日期 |
+| `net_asset_size` | TEXT | **净资产规模**（如："10.5 亿"） |
+| `share_size` | TEXT | **份额规模**（如："9.8 亿份"） |
+| `updated_at` | TIMESTAMP | 更新时间 |
+
+### 2. fund_nav - 基金净值表
+
+| 字段名 | 类型 | 说明 |
+|:------:|:----:|:-----|
+| `id` | INTEGER | **主键** - 自增 |
+| `fund_code` | TEXT | 基金代码 |
+| `nav_date` | DATE | 净值日期 |
+| `unit_nav` | REAL | 单位净值 |
+| `accumulated_nav` | REAL | 累计净值 |
+| `daily_growth` | REAL | 日增长率 |
+| `created_at` | TIMESTAMP | 创建时间 |
+
+**唯一约束**: `(fund_code, nav_date)`
+
+### 3. fund_holdings - 基金持仓表
+
+| 字段名 | 类型 | 说明 |
+|:------:|:----:|:-----|
+| `id` | INTEGER | **主键** - 自增 |
+| `fund_code` | TEXT | 基金代码 |
+| `report_date` | DATE | 报告期 |
+| `stock_code` | TEXT | 股票代码 |
+| `stock_name` | TEXT | 股票名称 |
+| `holding_ratio` | REAL | 占净值比例（%） |
+| `holding_amount` | INTEGER | 持股数量 |
+| `holding_value` | REAL | 持仓市值 |
+| `stock_type` | TEXT | 股票类型 |
+| `created_at` | TIMESTAMP | 创建时间 |
+
+### 4. fund_rating - 基金评级表
+
+| 字段名 | 类型 | 说明 |
+|:------:|:----:|:-----|
+| `id` | INTEGER | **主键** - 自增 |
+| `fund_code` | TEXT | 基金代码 |
+| `rating_date` | DATE | 评级日期 |
+| `rating_agency` | TEXT | 评级机构 |
+| `rating_1y` | INTEGER | 1 年期评级（1-5 星） |
+| `rating_2y` | INTEGER | 2 年期评级 |
+| `rating_3y` | INTEGER | 3 年期评级 |
+| `created_at` | TIMESTAMP | 创建时间 |
+
+### 5. update_log - 数据更新日志表
+
+| 字段名 | 类型 | 说明 |
+|:------:|:----:|:-----|
+| `id` | INTEGER | **主键** - 自增 |
+| `data_type` | TEXT | 数据类型（fund_list、daily_nav 等） |
+| `updated_at` | TIMESTAMP | 更新时间 |
+| `status` | TEXT | 状态（success/error） |
+| `message` | TEXT | 更新消息/错误信息 |
+
 ## 开发
 
 ```bash

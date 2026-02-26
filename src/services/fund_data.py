@@ -39,7 +39,8 @@ class FundDataService:
             last_update = cache_db.get_last_update_time("fund_list")
             if last_update and (datetime.now() - last_update).total_seconds() < self.update_interval * 3600:
                 # 缓存有效，从数据库获取
-                cursor = cache_db._get_connection()
+                conn = cache_db._get_connection()
+                cursor = conn.cursor()
                 cursor.execute("SELECT fund_code, fund_name, fund_type FROM fund_basic")
                 return [{"fund_code": row["fund_code"], "fund_name": row["fund_name"],
                         "fund_type": row["fund_type"]} for row in cursor.fetchall()]
@@ -231,28 +232,81 @@ class FundDataService:
         """
         获取基金排行
 
+        优先级：
+        1. AKShare 实时数据
+        2. 通过历史净值计算（仅适用于已缓存历史数据的基金）
+        3. 返回空列表
+
         Args:
             fund_type: 基金类型
 
         Returns:
             排行列表
         """
-        # 从 AKShare 获取
+        # 从 AKShare 获取（实时数据）
         try:
             ranking = await akshare_client.get_fund_ranking(fund_type)
-            return ranking
+            if ranking:
+                return ranking
         except Exception as e:
             print(f"AKShare 获取排行失败：{e}")
 
-        # 降级到聚宽
-        if config.jq_username and config.jq_password:
-            try:
-                ranking = await jq_client.get_fund_ranking(fund_type)
-                return ranking
-            except Exception as e:
-                print(f"聚宽获取排行失败：{e}")
+        # 降级方案：通过历史净值计算收益率
+        try:
+            return await self._calc_ranking_from_history(fund_type)
+        except Exception as e:
+            print(f"历史净值计算失败：{e}")
 
         return []
+
+    async def _calc_ranking_from_history(self, fund_type: str = "全部") -> List[Dict[str, Any]]:
+        """
+        通过历史净值计算基金收益率（备用方案）
+
+        注意：此方案仅适用于已缓存历史净值数据的基金
+
+        Args:
+            fund_type: 基金类型
+
+        Returns:
+            排行列表
+        """
+        import sqlite3
+        from src.services.returns_calculator import calc_returns
+
+        # 从缓存获取基金列表
+        cursor = cache_db._get_connection()
+        cursor.row_factory = sqlite3.Row
+
+        if fund_type == "全部":
+            cursor.execute("SELECT fund_code, fund_name, fund_type FROM fund_basic")
+        else:
+            cursor.execute("SELECT fund_code, fund_name, fund_type FROM fund_basic WHERE fund_type LIKE ?", (f"%{fund_type}%",))
+
+        funds = [{"fund_code": row["fund_code"], "fund_name": row["fund_name"], "fund_type": row["fund_type"]}
+                 for row in cursor.fetchall()]
+        cursor.close()
+
+        result = []
+        for fund in funds:
+            # 计算收益率
+            returns = calc_returns(fund["fund_code"])
+            if returns:
+                result.append({
+                    "fund_code": fund["fund_code"],
+                    "fund_name": fund["fund_name"],
+                    "fund_type": fund["fund_type"],
+                    "return_1m": returns.get("return_1m", 0),
+                    "return_3m": returns.get("return_3m", 0),
+                    "return_6m": returns.get("return_6m", 0),
+                    "return_1y": returns.get("return_1y", 0),
+                    "return_3y": returns.get("return_3y", 0),
+                    "return_ytd": returns.get("return_ytd", 0)
+                })
+
+        # 按近 1 年收益率排序
+        result.sort(key=lambda x: x.get("return_1y", 0), reverse=True)
+        return result
 
     async def get_fund_rating(self, fund_code: str) -> Optional[Dict[str, Any]]:
         """
