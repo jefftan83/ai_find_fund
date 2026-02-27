@@ -49,6 +49,7 @@ CONFIG = {
 # ==================== 不要修改以下代码 ====================
 
 from src.cache.db import cache_db
+from src.services.akshare_client import akshare_client
 from scripts.data_loader import (
     load_daily_nav,
     load_fund_ratings,
@@ -140,6 +141,76 @@ class FundDataUpdater:
         except Exception as e:
             self.log(f"❌ 失败：更新净值 - {e}", self.config["verbose"])
 
+    async def _load_missing_size(self):
+        """加载缺失规模数据的基金（内部实现）"""
+        # 从数据库获取所有缺少规模数据的基金代码
+        conn = cache_db._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT fund_code, fund_name FROM fund_basic
+            WHERE (net_asset_size IS NULL OR net_asset_size = '' OR net_asset_size = '---')
+               OR (share_size IS NULL OR share_size = '' OR share_size = '---')
+        ''')
+        missing_funds = [{'fund_code': row['fund_code'], 'fund_name': row['fund_name']}
+                         for row in cursor.fetchall()]
+        conn.close()
+
+        self.log(f'共找到 {len(missing_funds)} 只基金缺少规模数据', self.config["verbose"])
+
+        if len(missing_funds) == 0:
+            self.log('所有基金已有规模数据，无需加载', self.config["verbose"])
+            return
+
+        start_time = datetime.now()
+        success_count, error_count, skip_count = 0, 0, 0
+
+        for i, fund in enumerate(missing_funds, 1):
+            fund_code = fund['fund_code']
+
+            try:
+                # 获取规模数据
+                size_info = await akshare_client.get_fund_size(fund_code)
+
+                if size_info and (size_info.get('net_asset_size') or size_info.get('share_size')):
+                    # 过滤掉 '---' 这样的无效数据
+                    net_size = size_info.get('net_asset_size', '')
+                    share_size = size_info.get('share_size', '')
+
+                    if net_size and net_size not in ['---', ''] and share_size and share_size not in ['---', '']:
+                        cache_db.save_fund_basic(fund_code, {
+                            'fund_code': fund_code,
+                            'net_asset_size': net_size,
+                            'share_size': share_size
+                        })
+                        success_count += 1
+                        if i % 100 == 0 or i <= 10:
+                            self.log(f'  进度：{i}/{len(missing_funds)} - {fund_code} - 成功：{net_size}', self.config["verbose"])
+                    else:
+                        error_count += 1
+                        if i % 100 == 0:
+                            self.log(f'  进度：{i}/{len(missing_funds)} - {fund_code} - 返回无效数据：{net_size}', self.config["verbose"])
+                else:
+                    error_count += 1
+                    if i % 100 == 0:
+                        self.log(f'  进度：{i}/{len(missing_funds)} - {fund_code} - 返回空数据', self.config["verbose"])
+
+            except Exception as e:
+                error_count += 1
+                if i % 100 == 0:
+                    self.log(f'  进度：{i}/{len(missing_funds)} - {fund_code} - 错误：{str(e)[:50]}', self.config["verbose"])
+
+            if i % 500 == 0:
+                elapsed = (datetime.now() - start_time).total_seconds()
+                self.log(f'\n  [{i}/{len(missing_funds)}] 耗时：{elapsed:.1f}s | 成功:{success_count} | 失败:{error_count} | 跳过:{skip_count}\n', self.config["verbose"])
+
+        elapsed = (datetime.now() - start_time).total_seconds()
+        self.log(f'\n✅ 完成！', self.config["verbose"])
+        self.log(f'   成功：{success_count} 只 | 失败：{error_count} 只 | 跳过:{skip_count} 只', self.config["verbose"])
+        self.log(f'   总耗时：{elapsed:.1f}s ({elapsed/60:.1f} 分钟)', self.config["verbose"])
+
+        cache_db.log_update('size_missing_funds', 'success', f'Loaded {success_count} funds')
+
     async def update_size(self):
         """更新规模数据"""
         if not self.state.should_update("size", self.config["size_update_interval"]):
@@ -148,9 +219,7 @@ class FundDataUpdater:
 
         self.log("💰 开始更新：基金规模（缺失数据）...", self.config["verbose"])
         try:
-            # 动态导入 load_missing_size
-            from scripts.load_missing_size import load_missing_fund_size
-            await load_missing_fund_size()
+            await self._load_missing_size()
             self.state.mark_updated("size")
             self.log("✅ 完成：基金规模更新", self.config["verbose"])
         except Exception as e:

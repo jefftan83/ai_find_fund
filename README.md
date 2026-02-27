@@ -70,6 +70,41 @@ fund-advisor config-status
 fund-advisor version
 ```
 
+## 数据加载脚本
+
+### 主数据加载工具（手动操作）
+
+```bash
+python3 scripts/data_loader.py
+```
+
+提供 10 个数据加载选项：
+- 加载基金基本信息、评级、持仓
+- 加载当日净值、历史净值
+- 加载基金规模数据
+
+### 每日自动更新（定时任务）
+
+```bash
+python3 scripts/daily_update.py
+```
+
+每日自动执行：
+- 当日净值（每日）
+- 基金规模（每周，仅缺失数据）
+- 基金评级、持仓（每月）
+
+**配置说明**：编辑 `scripts/daily_update.py` 顶部的 `CONFIG` 配置项
+
+### 脚本变更说明（v2.0）
+
+以下脚本已迁移到 `data_loader.py`，不再单独维护：
+- `init_fund_db.py` → `data_loader.py` 选项 1
+- `load_fund_history.py` → `data_loader.py` 选项 5
+- `load_fund_history_batch.py` → `data_loader.py` 选项 6,7
+- `load_all_size.py` → `data_loader.py` 选项 8
+- `load_missing_size.py` → 已整合到 `daily_update.py`
+
 ## 对话流程
 
 1. **需求分析**：了解投资金额、期限、目标等
