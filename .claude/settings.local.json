@@ -14,7 +14,12 @@
       "Bash(sqlite3:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(chmod +x:*)",
+      "WebFetch(domain:www.anthropic.com)",
+      "WebFetch(domain:python.langchain.com)",
+      "WebFetch(domain:langchain-ai.github.io)",
+      "WebFetch(domain:arxiv.org)"
     ]
   }
 }

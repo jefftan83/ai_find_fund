@@ -60,7 +60,7 @@ class RequirementAgent:
         # 调用 LLM
         try:
             response = self.llm.chat(
-                messages=self.conversation_history[-10:],  # 保留最近 10 轮对话
+                messages=self.conversation_history[-30:],  # 保留最近 30 轮对话
                 system=self.SYSTEM_PROMPT,
                 max_tokens=500
             )

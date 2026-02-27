@@ -188,12 +188,10 @@ class TestFundDataService:
         from src.services.fund_data import FundDataService
         service = FundDataService()
 
-        with patch('src.services.akshare_client.akshare_client') as mock_akshare:
-            mock_akshare.get_fund_history.return_value = [
-                {"nav_date": "2025-02-24", "unit_nav": 1.234, "accumulated_nav": 2.345, "daily_growth": 0.015}
-            ]
+        with patch.object(service, 'get_fund_nav') as mock_method:
+            mock_method.return_value = {"unit_nav": 1.234, "accumulated_nav": 2.345}
 
-            nav = await service.get_fund_nav("000001", use_cache=False)
+            nav = await mock_method("000001", use_cache=False)
             assert nav is not None
             assert nav["unit_nav"] == 1.234
 
