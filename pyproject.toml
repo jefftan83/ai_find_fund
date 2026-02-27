@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "autogen-agentchat>=0.4",
     "anthropic>=0.40",
+    "openai>=1.0",
     "typer>=0.9",
     "rich>=13.0",
     "akshare>=1.12",

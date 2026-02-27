@@ -41,6 +41,47 @@ class Config:
 
     # LLM 配置
     @property
+    def llm_provider(self) -> str:
+        """获取 LLM 提供商：anthropic / openai / ollama"""
+        return self._config.get("llm_provider", "anthropic")
+
+    @property
+    def openai_api_key(self) -> Optional[str]:
+        """获取 OpenAI API Key"""
+        return os.getenv("OPENAI_API_KEY") or self._config.get("openai_api_key")
+
+    @property
+    def openai_base_url(self) -> Optional[str]:
+        """获取 OpenAI API 基础 URL"""
+        return os.getenv("OPENAI_BASE_URL") or self._config.get("openai_base_url")
+
+    @property
+    def openai_model(self) -> str:
+        """获取 OpenAI 模型名称"""
+        return self._config.get("openai_model", "gpt-4o")
+
+    @property
+    def ollama_base_url(self) -> Optional[str]:
+        """获取 Ollama API 基础 URL"""
+        return os.getenv("OLLAMA_BASE_URL") or self._config.get("ollama_base_url")
+
+    @property
+    def ollama_model(self) -> str:
+        """获取 Ollama 模型名称"""
+        return self._config.get("ollama_model", "qwen2.5:7b")
+
+    @property
+    def current_model(self) -> str:
+        """根据当前 provider 返回对应的模型名称"""
+        provider = self.llm_provider
+        if provider == "openai":
+            return self.openai_model
+        elif provider == "ollama":
+            return self.ollama_model
+        else:  # anthropic
+            return self.claude_model
+
+    @property
     def anthropic_api_key(self) -> Optional[str]:
         """获取 Anthropic API Key"""
         return os.getenv("ANTHROPIC_API_KEY") or self._config.get("anthropic_api_key")

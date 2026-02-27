@@ -11,7 +11,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Prompt
 
 from src.utils.config import config
-from src.utils.llm import ClaudeClient
+from src.utils.llm import create_llm_client
 from src.agents.manager import GroupChatManager
 
 app = typer.Typer(
@@ -59,7 +59,8 @@ def start(
     console.print()
 
     # 检查 API Key 配置
-    if not config.anthropic_api_key:
+    provider = config.llm_provider
+    if provider == "anthropic" and not config.anthropic_api_key:
         console.print("[bold red]❌ 错误：[/bold red] 未配置 Anthropic API Key")
         console.print()
         console.print("请通过以下方式之一配置：")
@@ -68,10 +69,45 @@ def start(
         console.print("     然后编辑 config.yaml，填入 anthropic_api_key")
         console.print()
         raise typer.Exit(code=1)
+    elif provider == "openai" and not config.openai_api_key:
+        console.print("[bold red]❌ 错误：[/bold red] 未配置 OpenAI API Key")
+        console.print()
+        console.print("请通过以下方式之一配置：")
+        console.print("  1. 设置环境变量：export OPENAI_API_KEY=your_api_key")
+        console.print("  2. 在 config.yaml 中配置 openai_api_key")
+        console.print()
+        raise typer.Exit(code=1)
+    elif provider == "ollama":
+        # Ollama 无需 API Key，检查服务是否可访问
+        import httpx
+        try:
+            base_url = config.ollama_base_url or "http://localhost:11434/v1"
+            # 移除 /v1 后缀进行检查
+            check_url = base_url.replace("/v1", "")
+            httpx.get(f"{check_url}/api/tags", timeout=5.0)
+        except Exception as e:
+            console.print("[bold red]❌ 错误：[/bold red] 无法连接到 Ollama 服务")
+            console.print()
+            console.print(f"详情：{str(e)}")
+            console.print()
+            console.print("请确保：")
+            console.print("  1. Ollama 已安装")
+            console.print("  2. 运行命令启动服务：ollama serve")
+            console.print(f"  3. 模型已下载：ollama pull {config.ollama_model}")
+            console.print()
+            raise typer.Exit(code=1)
 
-    # 初始化 LLM 客户端
+    # 初始化 LLM 客户端（使用工厂函数）
     try:
-        llm_client = ClaudeClient()
+        llm_client = create_llm_client()
+        console.print(f"[bold green]✅ 已加载 LLM 提供商：[/bold green] {provider}")
+        if provider == "ollama":
+            console.print(f"[dim] 模型：{config.ollama_model}[/dim]")
+        elif provider == "openai":
+            console.print(f"[dim] 模型：{config.openai_model}[/dim]")
+        else:
+            console.print(f"[dim] 模型：{config.claude_model}[/dim]")
+        console.print()
     except ValueError as e:
         console.print(f"[bold red]❌ 错误：[/bold red] {str(e)}")
         raise typer.Exit(code=1)
@@ -158,10 +194,12 @@ def version():
     """显示版本信息"""
     console.print("[bold blue]基金推荐助手[/bold blue] v0.1.0")
     console.print()
+    console.print(f"当前 LLM 提供商：{config.llm_provider}")
+    console.print()
     console.print("技术栈：")
     console.print("  - Python 3.10+")
     console.print("  - AutoGen (多 Agent 框架)")
-    console.print("  - Anthropic Claude (LLM)")
+    console.print("  - LLM: Anthropic/OpenAI/Ollama")
     console.print("  - AKShare (基金数据)")
     console.print()
 
@@ -171,9 +209,20 @@ def config_status():
     """显示配置状态"""
     console.print("[bold]当前配置状态[/bold]\n")
 
+    # LLM 配置
+    console.print(f"LLM 提供商：{config.llm_provider}")
+    console.print(f"当前模型：{config.current_model}")
+    console.print()
+
     # API Key 配置
-    api_key_status = "✅ 已配置" if config.anthropic_api_key else "❌ 未配置"
-    console.print(f"Anthropic API Key: {api_key_status}")
+    if config.llm_provider == "anthropic":
+        api_key_status = "✅ 已配置" if config.anthropic_api_key else "❌ 未配置"
+        console.print(f"Anthropic API Key: {api_key_status}")
+    elif config.llm_provider == "openai":
+        api_key_status = "✅ 已配置" if config.openai_api_key else "❌ 未配置"
+        console.print(f"OpenAI API Key: {api_key_status}")
+    else:
+        console.print(f"Ollama Base URL: {config.ollama_base_url or 'http://localhost:11434/v1'}")
 
     # 数据源配置
     tushare_status = "✅ 已配置" if config.tushare_token else "⚠️  未配置（可选）"

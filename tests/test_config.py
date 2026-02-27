@@ -136,3 +136,116 @@ class TestConfig:
         with patch.dict(os.environ, {"ANTHROPIC_BASE_URL": "https://env-api.com"}):
             config = Config()
             assert config.anthropic_base_url == "https://env-api.com"
+
+
+class TestLLMProviderConfig:
+    """LLM 提供商配置测试"""
+
+    def test_default_llm_provider(self):
+        """CFG-101: 默认 LLM 提供商为 anthropic"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write("claude_model: test-model\n")
+            f.name
+
+        try:
+            config = Config(Path(f.name))
+            assert config.llm_provider == "anthropic"
+        finally:
+            os.unlink(f.name)
+
+    def test_llm_provider_config(self):
+        """CFG-102: 配置 LLM 提供商"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write('llm_provider: "openai"\n')
+            f.name
+
+        try:
+            config = Config(Path(f.name))
+            assert config.llm_provider == "openai"
+        finally:
+            os.unlink(f.name)
+
+    def test_openai_config(self):
+        """CFG-103: OpenAI 配置"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write('openai_api_key: "sk-test-key"\n')
+            f.write('openai_base_url: "https://api.openai.com/v1"\n')
+            f.write('openai_model: "gpt-4o"\n')
+            f.name
+
+        try:
+            config = Config(Path(f.name))
+            assert config.openai_api_key == "sk-test-key"
+            assert config.openai_base_url == "https://api.openai.com/v1"
+            assert config.openai_model == "gpt-4o"
+        finally:
+            os.unlink(f.name)
+
+    def test_openai_env(self):
+        """CFG-104: OpenAI 配置从环境变量读取"""
+        with patch.dict(os.environ, {
+            "OPENAI_API_KEY": "sk-env-key",
+            "OPENAI_BASE_URL": "https://env-api.com"
+        }):
+            config = Config()
+            assert config.openai_api_key == "sk-env-key"
+            assert config.openai_base_url == "https://env-api.com"
+
+    def test_ollama_config(self):
+        """CFG-105: Ollama 配置"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write('ollama_base_url: "http://localhost:11434/v1"\n')
+            f.write('ollama_model: "qwen2.5:7b"\n')
+            f.name
+
+        try:
+            config = Config(Path(f.name))
+            assert config.ollama_base_url == "http://localhost:11434/v1"
+            assert config.ollama_model == "qwen2.5:7b"
+        finally:
+            os.unlink(f.name)
+
+    def test_ollama_env(self):
+        """CFG-106: Ollama 配置从环境变量读取"""
+        with patch.dict(os.environ, {"OLLAMA_BASE_URL": "http://env-ollama:11434/v1"}):
+            config = Config()
+            assert config.ollama_base_url == "http://env-ollama:11434/v1"
+
+    def test_current_model_anthropic(self):
+        """CFG-107: current_model 返回 Anthropic 模型"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write('llm_provider: "anthropic"\n')
+            f.write('claude_model: "claude-sonnet"\n')
+            f.name
+
+        try:
+            config = Config(Path(f.name))
+            assert config.current_model == "claude-sonnet"
+        finally:
+            os.unlink(f.name)
+
+    def test_current_model_openai(self):
+        """CFG-108: current_model 返回 OpenAI 模型"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write('llm_provider: "openai"\n')
+            f.write('openai_model: "gpt-4o"\n')
+            f.name
+
+        try:
+            config = Config(Path(f.name))
+            assert config.current_model == "gpt-4o"
+        finally:
+            os.unlink(f.name)
+
+    def test_current_model_ollama(self):
+        """CFG-109: current_model 返回 Ollama 模型"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write('llm_provider: "ollama"\n')
+            f.write('ollama_model: "llama3.2"\n')
+            f.name
+
+        try:
+            config = Config(Path(f.name))
+            assert config.current_model == "llama3.2"
+        finally:
+            os.unlink(f.name)
